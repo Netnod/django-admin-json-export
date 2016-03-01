@@ -1,7 +1,7 @@
 from distutils.core import setup
 setup(
     name='django-admin-json-export',
-    version='1.0.0',
+    version='1.0.1',
     #
     author="Henrik Levkowetz",
     author_email="henrik@levkowetz.com",
