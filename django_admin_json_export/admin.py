@@ -6,18 +6,17 @@ import django.contrib.admin
 
 from django.conf.urls import patterns, url
 from django.contrib.admin import *
-from django.contrib.admin.util import unquote
+from django.contrib.admin.utils import unquote
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, FieldError
 from django.core.serializers import serialize
 from django.core.serializers.json import Serializer
 from django.http import HttpResponse, Http404
-from django.utils.encoding import smart_unicode
+from django.utils.encoding import smart_text, force_text
 from django.utils.html import escape
 from django.db.models import Field
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_save, post_delete, m2m_changed
-from django.utils.encoding import force_unicode
 from django.utils.translation import ugettext as _
 
 
@@ -123,7 +122,7 @@ class AdminJsonSerializer(Serializer):
         for name in expansions:
             try:
                 field = getattr(obj, name)
-                #self._current["_"+name] = smart_unicode(field)
+                #self._current["_"+name] = smart_text(field)
                 if not isinstance(field, Field):
                     options = self.options.copy()
                     options["expand"] = [ v[len(name)+2:] for v in options["expand"] if v.startswith(name+"__") ]
@@ -187,10 +186,10 @@ class AdminJsonSerializer(Serializer):
                 related = related.natural_key()
             elif field.rel.field_name == related._meta.pk.name:
                 # Related to remote object via primary key
-                related = smart_unicode(related._get_pk_val(), strings_only=True)
+                related = smart_text(related._get_pk_val(), strings_only=True)
             else:
                 # Related to remote object via other field
-                related = smart_unicode(getattr(related, field.rel.field_name), strings_only=True)
+                related = smart_text(getattr(related, field.rel.field_name), strings_only=True)
         self._current[field.name] = related
 
     def handle_m2m_field(self, obj, field):
@@ -200,7 +199,7 @@ class AdminJsonSerializer(Serializer):
             elif self.use_natural_keys and hasattr(field.rel.to, 'natural_key'):
                 m2m_value = lambda value: value.natural_key()
             else:
-                m2m_value = lambda value: smart_unicode(value._get_pk_val(), strings_only=True)
+                m2m_value = lambda value: smart_text(value._get_pk_val(), strings_only=True)
             self._current[field.name] = [m2m_value(related)
                                for related in getattr(obj, field.name).iterator()]
 
@@ -260,7 +259,7 @@ class JSONMixin(object):
         query_info = "%s?%s" % (request.META["PATH_INFO"], request.META["QUERY_STRING"])
         try:
             qs = self.get_queryset(request).filter(**filter).exclude(**exclude)
-        except (FieldError, ValueError), e:
+        except (FieldError, ValueError) as e:
             return HttpResponse(json.dumps({u"error": str(e)}, sort_keys=True, indent=3), content_type=content_type)
         try:
             if exp:
@@ -269,9 +268,9 @@ class JSONMixin(object):
             items = [(getattr(o, key), serializer.serialize([o], expand=expand, query_info=query_info) )  for o in qs ]
             cache.set(model_top_level_cache_key(self.model), True)
             qd = dict( ( k, json.loads(v)[0] )  for k,v in items )
-        except (FieldError, ValueError), e:
+        except (FieldError, ValueError) as e:
             return HttpResponse(json.dumps({u"error": str(e)}, sort_keys=True, indent=3), content_type=content_type)
-        text = json.dumps({smart_unicode(self.model._meta): qd}, sort_keys=True, indent=3)
+        text = json.dumps({smart_text(self.model._meta): qd}, sort_keys=True, indent=3)
         return HttpResponse(text, content_type=content_type)
 
     def json_view(self, request, object_id, extra_context=None):
@@ -288,7 +287,7 @@ class JSONMixin(object):
             raise PermissionDenied
 
         if obj is None:
-            raise Http404(_('%(name)s object with primary key %(key)r does not exist.') % {'name': force_unicode(self.model._meta.verbose_name), 'key': escape(object_id)})
+            raise Http404(_('%(name)s object with primary key %(key)r does not exist.') % {'name': force_text(self.model._meta.verbose_name), 'key': escape(object_id)})
 
         content_type = 'application/json' if 'application/json' in request.META['HTTP_ACCEPT'] else 'text/plain'
         return HttpResponse(serialize("json", [ obj ], sort_keys=True, indent=3)[2:-2], content_type=content_type)
