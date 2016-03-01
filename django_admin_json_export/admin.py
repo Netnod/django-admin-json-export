@@ -204,7 +204,7 @@ class AdminJsonSerializer(Serializer):
                                for related in getattr(obj, field.name).iterator()]
 
 
-class JSONMixin(object):
+class JsonExportMixin(object):
     """
     Adds JSON export to the admin interface.
     """
